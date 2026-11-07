@@ -52,17 +52,40 @@ async function generateInterviewReport({ resume, selfDescription, jobDescription
 
 async function generatePdfFromHtml(htmlContent) {
     let browser;
+    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+
     try {
-        browser = await puppeteer.launch({
-            channel: 'chrome',
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
-    } catch {
-        browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
-        });
+        if (executablePath) {
+            // Production (Render/Docker): use system Chromium
+            browser = await puppeteer.launch({
+                headless: true,
+                executablePath,
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--no-zygote',
+                    '--single-process'
+                ]
+            });
+        } else {
+            // Local: try system Chrome first, fall back to bundled Chromium
+            try {
+                browser = await puppeteer.launch({
+                    channel: 'chrome',
+                    headless: true,
+                    args: ['--no-sandbox', '--disable-setuid-sandbox']
+                });
+            } catch {
+                browser = await puppeteer.launch({
+                    headless: true,
+                    args: ['--no-sandbox', '--disable-setuid-sandbox']
+                });
+            }
+        }
+    } catch (err) {
+        throw new Error(`Failed to launch browser for PDF generation: ${err.message}`);
     }
 
     try {
